@@ -12,7 +12,7 @@ class Expr
 case class bacht_ast_empty_agent() extends Expr
 case class bacht_ast_primitive(primitive: String, token: String) extends Expr
 case class bacht_ast_agent(op: String, agenti: Expr, agentii: Expr) extends Expr
-case class bacht_ast_wait(primitive: String,time: Int) extends Expr
+case class bacht_ast_wait(time: Int) extends Expr
 import scala.util.parsing.combinator._
 import scala.util.matching.Regex
 
@@ -34,7 +34,7 @@ class BachTParsers extends RegexParsers {
                                    "nask("~token~")" ^^ {
         case _ ~ vtoken ~ _  => bacht_ast_primitive("nask",vtoken) }  |
                                     "wait("~time~")" ^^ {
-        case _ ~ vtime ~ _  => bacht_ast_wait("wait",vtime.toInt) }
+        case _ ~ vtime ~ _  => bacht_ast_wait(vtime.toInt) }
 
   def agent = compositionChoice
 
@@ -147,13 +147,15 @@ class BachTSimul(var bb: BachTStore) {
 
          case bacht_ast_agent(";",ag_i,ag_ii) =>
             {  run_one(ag_i) match
-                  { case (false,_) => (false,agent)
+                  {
+                    case (false,bacht_ast_wait(time))=>(false,bacht_ast_wait(time))
+                    case (false,_) => (false,agent)
                     case (true,bacht_ast_empty_agent()) => (true,ag_ii)
                     case (true,ag_cont) => (true,bacht_ast_agent(";",ag_cont,ag_ii))
                   }
             }
 
-         case bacht_ast_wait(prim,time)=>
+         case bacht_ast_wait(time)=>
            {
              val timeWait=timestampBegin+time
              val timestamp: Long = System.currentTimeMillis / 1000
@@ -161,7 +163,8 @@ class BachTSimul(var bb: BachTStore) {
              if(timeWait<timestamp){
                (true,bacht_ast_empty_agent())
              }else{
-               (false,bacht_ast_wait(prim,time))
+               Thread.sleep(500)
+               (false,bacht_ast_wait(time))
              }
            }
          case bacht_ast_agent("||", ag_i, ag_ii) =>{
@@ -173,15 +176,25 @@ class BachTSimul(var bb: BachTStore) {
              x = ag_i
              y = ag_ii
            }
-
+          println(x)
            run_one( x ) match
-             { case (false,_) =>
+             { case (false,bacht_ast_wait(time)) =>
               { run_one( y ) match
-               { case (false,_) => (false,agent)
+               {
+                 case (false,_) => (false,bacht_ast_wait(time))
                  case (true,bacht_ast_empty_agent()) => (true,ag_i)
                  case (true,ag_cont) => (true,bacht_ast_agent("||",x,ag_cont))
                }
              }
+             case (false,_) =>
+               { run_one( y ) match
+                 {
+                 case (false,bacht_ast_wait(time))=> (false,bacht_ast_wait(time))
+                   case (false,_) => (false,agent)
+                   case (true,bacht_ast_empty_agent()) => (true,ag_i)
+                   case (true,ag_cont) => (true,bacht_ast_agent("||",x,ag_cont))
+                 }
+               }
              case (true,bacht_ast_empty_agent()) => (true,y)
 
              case (true,ag_cont)=> (true,bacht_ast_agent("||",ag_cont,y))
@@ -202,9 +215,20 @@ class BachTSimul(var bb: BachTStore) {
            }
 
            run_one( x ) match
-             { case (false,_) =>
+             {
+             case (false,bacht_ast_wait(time)) =>
                { run_one( y ) match
-                 { case (false,_) => (false,agent)
+                 {
+                   case (false,_) => (false,bacht_ast_wait(time))
+                   case (true,bacht_ast_empty_agent()) => (true,ag_i)
+                   case (true,ag_cont) => (true,bacht_ast_agent("||",x,ag_cont))
+                 }
+             }
+              case (false,_) =>
+               { run_one( y ) match
+                 {
+                   case (false,bacht_ast_wait(time)) => (false,bacht_ast_wait(time))
+                   case (false,_) => (false,agent)
                    case (true,bacht_ast_empty_agent()) => (true,bacht_ast_empty_agent())
                    case (true,ag_cont) => (true,ag_cont)
                  }
@@ -226,7 +250,7 @@ class BachTSimul(var bb: BachTStore) {
        while ( c_agent != bacht_ast_empty_agent() && !failure ) {
           failure = run_one(c_agent) match
                {
-                case (false,bacht_ast_wait(prim,time))=> {
+                case (false,bacht_ast_wait(time))=> {
                   println("on passe un tour "+time)
                   println("c_agent actuel : "+c_agent)
                   c_agent=(c_agent)
