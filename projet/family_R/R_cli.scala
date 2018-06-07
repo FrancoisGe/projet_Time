@@ -149,7 +149,7 @@ class BachTStore {
 
   def nask_time(token:String,time:Int):Boolean = {
     val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(x._1._2-timeStore>0)&&(x._2>=1))
-    println("askTime")
+    println("naskTime")
     println(listGoodToken)
     if (listGoodToken.isEmpty){true}
     else false
@@ -224,9 +224,22 @@ class BachTSimul(var bb: BachTStore) {
            }
 
            run_one( x ) match
-             { case (false,_) =>
+             {
+
+             case (false,bacht_ast_delay(time)) =>
+               { run_one( y ) match
+                 {
+                   case (false,_) => (false,bacht_ast_delay(time))
+                   case (true,bacht_ast_empty_agent()) => (true,ag_i)
+                   case (true,ag_cont) => (true,bacht_ast_agent("||",x,ag_cont))
+                 }
+               }
+
+              case (false,_) =>
               { run_one( y ) match
-               { case (false,_) => (false,agent)
+               {
+                 case (false,bacht_ast_delay(time)) => (false,bacht_ast_delay(time))
+                 case (false,_) => (false,agent)
                  case (true,bacht_ast_empty_agent()) => (true,ag_i)
                  case (true,ag_cont) => (true,bacht_ast_agent("||",x,ag_cont))
                }
@@ -251,9 +264,20 @@ class BachTSimul(var bb: BachTStore) {
            }
 
            run_one( x ) match
-             { case (false,_) =>
+             {
+             case (false,bacht_ast_delay(time)) =>
                { run_one( y ) match
-                 { case (false,_) => (false,agent)
+                 { case (false,_) => (false,bacht_ast_delay(time))
+                   case (true,bacht_ast_empty_agent()) => (true,bacht_ast_empty_agent())
+                   case (true,ag_cont) => (true,ag_cont)
+                 }
+               }
+
+             case (false,_) =>
+               { run_one( y ) match
+                 {
+                   case (false,bacht_ast_delay(time)) => (false,bacht_ast_delay(time))
+                   case (false,_) => (false,agent)
                    case (true,bacht_ast_empty_agent()) => (true,bacht_ast_empty_agent())
                    case (true,ag_cont) => (true,ag_cont)
                  }
