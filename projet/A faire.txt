@@ -1,0 +1,17 @@
+Créer mon interpreteur
+
+Avoir un arbre syntaxque
+On fait un simulateur qui choisi une bone exécution( pas bloquante)
+
+Aller voir le doc bacht.pdf avec exemple de run
+
+O, fait ca en scala 
+Librairie de parceur :  voir doc batch.pdf
+
+Pour best : 
+	On créer un dsl qu on veut pouvoir etre utilisé depuis l extérireur
+
+
+Voir le mémoire sur webcampus pour faire dsl
+
+Projet 1 graphique = petite ide
