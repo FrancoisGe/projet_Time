@@ -34,7 +34,7 @@ class BachTParsers extends RegexParsers {
                                    "nask("~token~")" ^^ {
         case _ ~ vtoken ~ _  => bacht_ast_primitive("nask",vtoken) }  |
                                     "wait("~time~")" ^^ {
-        case _ ~ vtime ~ _  => bacht_ast_wait("wait",vtime) }
+        case _ ~ vtime ~ _  => bacht_ast_wait("wait",vtime.toInt) }
 
   def agent = compositionChoice
 
@@ -135,6 +135,7 @@ import language.postfixOps
 class BachTSimul(var bb: BachTStore) {
 
    val bacht_random_choice = new Random()
+   val timestampBegin: Long = System.currentTimeMillis / 1000
 
    def run_one(agent: Expr):(Boolean,Expr) = {
 
@@ -154,10 +155,13 @@ class BachTSimul(var bb: BachTStore) {
 
          case bacht_ast_wait(prim,time)=>
            {
+             val timeWait=timestampBegin+time
              val timestamp: Long = System.currentTimeMillis / 1000
-             println(timestamp " : "+time)
-             if(time<timestamp){
-               
+             println(timestamp +" : "+timeWait)
+             if(timeWait<timestamp){
+               (true,bacht_ast_empty_agent())
+             }else{
+               (false,bacht_ast_wait(prim,time))
              }
            }
          case bacht_ast_agent("||", ag_i, ag_ii) =>{
@@ -221,8 +225,16 @@ class BachTSimul(var bb: BachTStore) {
        var c_agent = agent
        while ( c_agent != bacht_ast_empty_agent() && !failure ) {
           failure = run_one(c_agent) match
-               { case (false,_)          => true
-                 case (true,new_agent)  =>
+               {
+                case (false,bacht_ast_wait(prim,time))=> {
+                  println("on passe un tour "+time)
+                  println("c_agent actuel : "+c_agent)
+                  c_agent=(c_agent)
+                  println("c_agent new : "+c_agent)
+                  false
+                } // gestion du cas ou on ne peut rien faire sauf décrémenter les delays
+                case (false,_)          => true
+                case (true,new_agent)  =>
                     { c_agent = new_agent
                       false
                     }
