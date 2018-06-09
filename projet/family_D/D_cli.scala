@@ -152,8 +152,8 @@ class BachTSimul(var bb: BachTStore) {
             }
 
          case bacht_ast_delay(time)=>{
-           if(time>0) {println("ici");(false,bacht_ast_delay(time))}
-           else {println("ici 2 "); (true,bacht_ast_empty_agent())}
+           if(time>0) {(false,bacht_ast_delay(time))}
+           else { (true,bacht_ast_empty_agent())}
          }
 
 

@@ -12,7 +12,7 @@ class Expr
 case class bacht_ast_empty_agent() extends Expr
 case class bacht_ast_primitive(primitive: String, token: String) extends Expr
 case class bacht_ast_primitive_with_time(primitive: String, token: String,begin: Int,end:Int) extends Expr
-//case class bacht_ast_dead_agent() extends Expr
+case class bacht_ast_dead_agent() extends Expr
 case class bacht_ast_delay(token: Int) extends Expr
 case class bacht_ast_wait(token: Int) extends Expr
 case class bacht_ast_agent(op: String, agenti: Expr, agentii: Expr) extends Expr
@@ -152,8 +152,8 @@ class BachTStore {
     val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
     val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(checkTime(x._1._2,x._1._3))&&(x._2>=1))
     println("askTime")
-    println(listGoodToken)
-    if (listGoodToken.nonEmpty ||(theStore.contains(token)&&theStore(token) >= 1)){println("ok ack");true}
+
+    if (listGoodToken.nonEmpty ||(theStore.contains(token)&&theStore(token) >= 1)){true}
     else false
 
   }
@@ -179,7 +179,7 @@ class BachTStore {
   def nask_time(token:String,begin:Int,end:Int):Boolean = {
     val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
     val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(checkTime(x._1._2,x._1._3))&&(x._2>=1))
-    println(listGoodToken)
+
     println("naskTime")
     if (listGoodToken.isEmpty&&nask(token)){true}
     else false
@@ -276,13 +276,18 @@ class BachTSimul(var bb: BachTStore) {
            {
              println("Wait")
              if(bb.checkBegin(time)){
-               println("ok")
                (true,bacht_ast_empty_agent())
              }else{
                (false,bacht_ast_delay(time))
              }
            }
 
+         case bacht_ast_delay(time)=>{
+           if(time>0) {(false,bacht_ast_delay(time))}
+           else { (true,bacht_ast_empty_agent())}
+         }
+
+         case bacht_ast_dead_agent()=> (true,bacht_ast_empty_agent())
 
 
          case bacht_ast_agent(";",ag_i,ag_ii) =>
@@ -377,15 +382,18 @@ class BachTSimul(var bb: BachTStore) {
   /*
   Applique le passage d'une unité de temps à agent
    */
-  /*
+
   def sleep_time(agent:Expr):Expr = agent match {
     case bacht_ast_primitive(prim,token) => agent
 
-    case bacht_ast_primitive_with_time(prim,token,begin,end)=> {
+    case bacht_ast_delay(time)=> {
       if(time>1) {
-        bacht_ast_primitive_with_time(prim, token, time - 1)
+        println ("delay time "+time)
+        bacht_ast_delay(time-1)
       }else bacht_ast_dead_agent()
     }
+
+    case bacht_ast_primitive_with_time(prim,token,begin,end) =>agent
 
 
 
@@ -396,8 +404,9 @@ class BachTSimul(var bb: BachTStore) {
 
 
     case bacht_ast_agent("+",ag_i,ag_ii) =>bacht_ast_agent("+",sleep_time(ag_i), sleep_time(ag_ii))
+    case _ => agent
 
-  }*/
+  }
 
    def bacht_exec_all(agent: Expr):Boolean = {
 
@@ -407,7 +416,8 @@ class BachTSimul(var bb: BachTStore) {
           failure = run_one(c_agent) match
                {
                 case (false,bacht_ast_delay(time))=> {
-                  println("on wait")
+                  c_agent = sleep_time(c_agent)
+
                   Thread.sleep(800)
                   false
                 } // gestion du cas ou on ne peut rien faire sauf décrémenter les delays
