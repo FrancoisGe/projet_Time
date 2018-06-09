@@ -12,7 +12,7 @@ class Expr
 case class bacht_ast_empty_agent() extends Expr
 case class bacht_ast_primitive(primitive: String, token: String) extends Expr
 case class bacht_ast_primitive_with_time(primitive: String, token: String,begin: Int,end:Int) extends Expr
-case class bacht_ast_dead_agent() extends Expr
+//case class bacht_ast_dead_agent() extends Expr
 case class bacht_ast_delay(token: Int) extends Expr
 case class bacht_ast_agent(op: String, agenti: Expr, agentii: Expr) extends Expr
 import scala.util.parsing.combinator._
@@ -28,13 +28,13 @@ class BachTParsers extends RegexParsers {
   val opSeq     : Parser[String] = ";"
 
   def primitive : Parser[Expr]   = "tell("~token~"," ~time~"," ~time~")" ^^ {
-    case _ ~ vtoken ~ "," ~ vtime ~"," ~ vtime ~ _ => bacht_ast_primitive_with_time("tell",vtoken,vtime.toInt) }  |
+    case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _ => bacht_ast_primitive_with_time("tell",vtoken,btime.toInt,etime.toInt) }  |
                                    "ask("~token~"," ~time~"," ~time~")" ^^ {
-      case _ ~ vtoken ~ "," ~ vtime ~"," ~ vtime ~ _  => bacht_ast_primitive_with_time("ask",vtoken,vtime.toInt) }   |
+      case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _  => bacht_ast_primitive_with_time("ask",vtoken,btime.toInt,etime.toInt) }   |
                                     "get("~token~"," ~time~"," ~time~")" ^^ {
-      case _ ~ vtoken ~ "," ~ vtime ~"," ~ vtime ~ _  => bacht_ast_primitive_with_time("get",vtoken,vtime.toInt) }   |
+      case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _  => bacht_ast_primitive_with_time("get",vtoken,btime.toInt,etime.toInt) }   |
                                    "nask("~token~"," ~time~"," ~time~")" ^^ {
-      case _ ~ vtoken ~ "," ~ vtime ~"," ~ vtime ~ _  => bacht_ast_primitive_with_time("nask",vtoken,vtime.toInt) }
+      case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _  => bacht_ast_primitive_with_time("nask",vtoken,btime.toInt,etime.toInt) }
 
   def agent = compositionChoice
 
@@ -74,9 +74,9 @@ import scala.swing._
 
 class BachTStore {
 
-   var theStoreTime = Map[(String,Int),Int]()
+   var theStoreTime = Map[(String,Int,Int),Int]()
    var theStore = Map[String,Int]()
-   var timeStore:Int = 0
+   val timestampBegin: Int = (System.currentTimeMillis / 1000).toInt
 
    def tell(token:String):Boolean = {
       if (theStore.contains(token)) 
@@ -114,8 +114,11 @@ class BachTStore {
    }
 
   // Version avec time
-  def tell_time(token:String,time:Int):Boolean = {
-    val tokenTime = (token,time+timeStore)
+  def tell_time(token:String,begin:Int,end:Int):Boolean = {
+
+
+    val tokenTime = (token,begin,end)
+    println("tell "+ token)
     if (theStoreTime.contains(tokenTime))
     { theStoreTime(tokenTime) = theStoreTime(tokenTime) + 1 }
     else
@@ -124,19 +127,21 @@ class BachTStore {
   }
 
 
-  def ask_time(token:String,time:Int):Boolean = {
-    val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(x._1._2-timeStore>0)&&(x._2>=1))
+  def ask_time(token:String,begin:Int,end:Int):Boolean = {
+    val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
+    val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(checkTime(x._1._2,x._1._3))&&(x._2>=1))
     println("askTime")
-    println(listGoodToken)
     if (listGoodToken.nonEmpty){true}
     else false
 
   }
 
   //todo
-  def get_time(token:String,time:Int):Boolean = {
-    val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(x._1._2-timeStore>0)&&(x._2>=1))
+  def get_time(token:String,begin:Int,end:Int):Boolean = {
+    val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
+    val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(checkTime(x._1._2,x._1._3))&&(x._2>=1))
     if(listGoodToken.nonEmpty){
+      println("get")
       var acc = listGoodToken.last
       val tokenGet =listGoodToken.foldLeft(acc){(acc, token)=> if(acc._1._2<=token._1._2){acc}else{token}}
       theStoreTime(tokenGet._1)=theStoreTime(tokenGet._1)-1
@@ -147,24 +152,52 @@ class BachTStore {
   }
 
 
-  def nask_time(token:String,time:Int):Boolean = {
-    val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(x._1._2-timeStore>0)&&(x._2>=1))
+  def nask_time(token:String,begin:Int,end:Int):Boolean = {
+    val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
+    val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(checkTime(x._1._2,x._1._3))&&(x._2>=1))
     println("naskTime")
-    println(listGoodToken)
     if (listGoodToken.isEmpty){true}
     else false
   }
 
+
   /*
   On avance d'une unité de temps le store et on supprime les tokens qui ne sont plus qui on passé leur temps de validité
    */
+  //TODO
+  /*
   def spent_time()={
     timeStore=timeStore+1
     theStoreTime=theStoreTime.filter(t=>t._1._2>timeStore)
+  }*/
+  /*
+  Renvoie true si end est >= au temps actuel et begin est <= au temps actuel
+  sinon false
+   */
+   def checkTime(begin:Int,end:Int): Boolean ={
+    val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
+    checkBegin(begin)&&checkEnd(end)
+  }
+  /*
+  Renvoie true si end est >= au temps actuel
+  sinon false
+   */
+  def checkEnd(end:Int):Boolean={
+    val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
+    (end>=actTime)
+  }
+  /*
+  Renvoie true si begin est <= au temps actuel
+  sinon false
+   */
+  def checkBegin(begin:Int):Boolean={
+    val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
+    (begin<=actTime)
   }
 
    def print_store {
-     println("Time Store : "+timeStore)
+     val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
+     println("Time Store : "+actTime)
       print("{ ")
       for ((t,d) <- theStore) 
          print ( t + "(" + theStore(t) + ")" )
@@ -198,12 +231,15 @@ class BachTSimul(var bb: BachTStore) {
             {  if (exec_primitive(prim,token)) { (true,bacht_ast_empty_agent()) }
                else { (false,agent) }
             }
-         case bacht_ast_primitive_with_time(prim,token,time) =>
-           {  if (exec_primitive_with_time(prim,token,time)) { (true,bacht_ast_empty_agent()) }
-           else { (false,bacht_ast_delay(0)) }
+         case bacht_ast_primitive_with_time(prim,token,begin,end) =>
+          if (bb.checkEnd(end)){
+            if (bb.checkBegin(begin)&&exec_primitive_with_time(prim,token,begin,end)) { (true,bacht_ast_empty_agent()) }
+            else { (false,bacht_ast_delay(0)) }
+          }else{
+            (false,agent)
            }
 
-         case bacht_ast_dead_agent()=> (false,agent)
+
 
          case bacht_ast_agent(";",ag_i,ag_ii) =>
             {  run_one(ag_i) match
@@ -295,10 +331,11 @@ class BachTSimul(var bb: BachTStore) {
   /*
   Applique le passage d'une unité de temps à agent
    */
+  /*
   def sleep_time(agent:Expr):Expr = agent match {
     case bacht_ast_primitive(prim,token) => agent
 
-    case bacht_ast_primitive_with_time(prim,token,time)=> {
+    case bacht_ast_primitive_with_time(prim,token,begin,end)=> {
       if(time>1) {
         bacht_ast_primitive_with_time(prim, token, time - 1)
       }else bacht_ast_dead_agent()
@@ -314,7 +351,7 @@ class BachTSimul(var bb: BachTStore) {
 
     case bacht_ast_agent("+",ag_i,ag_ii) =>bacht_ast_agent("+",sleep_time(ag_i), sleep_time(ag_ii))
 
-  }
+  }*/
 
    def bacht_exec_all(agent: Expr):Boolean = {
 
@@ -324,11 +361,7 @@ class BachTSimul(var bb: BachTStore) {
           failure = run_one(c_agent) match
                {
                 case (false,bacht_ast_delay(time))=> {
-                  bb.spent_time()
-                  println("on passe un tour "+time)
-                  println("c_agent actuel : "+c_agent)
-                  c_agent=sleep_time(c_agent)
-                  println("c_agent new : "+c_agent)
+                  Thread.sleep(800)
                   false
                 } // gestion du cas ou on ne peut rien faire sauf décrémenter les delays
                  case (false,_)          => true
@@ -362,12 +395,12 @@ class BachTSimul(var bb: BachTStore) {
 
 
 
-  def exec_primitive_with_time(prim:String,token:String,time: Int):Boolean = {
+  def exec_primitive_with_time(prim:String,token:String,begin: Int,end:Int):Boolean = {
     prim match
-    { case "tell" => bb.tell_time(token,time)
-    case "ask"  => bb.ask_time(token,time)
-    case "get"  => bb.get_time(token,time)
-    case "nask" => bb.nask_time(token,time)
+    { case "tell" => bb.tell_time(token,begin,end)
+    case "ask"  => bb.ask_time(token,begin,end)
+    case "get"  => bb.get_time(token,begin,end)
+    case "nask" => bb.nask_time(token,begin,end)
     }
   }
 }
