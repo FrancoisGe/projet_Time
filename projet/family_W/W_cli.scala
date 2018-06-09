@@ -19,7 +19,7 @@ import scala.util.matching.Regex
 class BachTParsers extends RegexParsers {
 
   def token 	: Parser[String] = ("[a-z][0-9a-zA-Z_]*").r ^^ {_.toString}
-  def time 	: Parser[String] = ("[0-9a]*").r ^^ {_.toString}
+  def time 	: Parser[String] = ("[0-9]*").r ^^ {_.toString}
 
   val opChoice  : Parser[String] = "+" 
   val opPara    : Parser[String] = "||"
