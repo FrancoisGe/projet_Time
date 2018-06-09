@@ -207,7 +207,9 @@ class BachTSimul(var bb: BachTStore) {
 
          case bacht_ast_agent(";",ag_i,ag_ii) =>
             {  run_one(ag_i) match
-                  { case (false,_) => (false,agent)
+                  {
+                     case (false,bacht_ast_delay(time))=>(false,bacht_ast_delay(time))
+                    case (false,_) => (false,agent)
                     case (true,bacht_ast_empty_agent()) => (true,ag_ii)
                     case (true,ag_cont) => (true,bacht_ast_agent(";",ag_cont,ag_ii))
                   }
