@@ -233,7 +233,7 @@ class BachTSimul(var bb: BachTStore) {
                { run_one( y ) match
                  {
                    case (false,_) => (false,bacht_ast_delay(time))
-                   case (true,bacht_ast_empty_agent()) => (true,ag_i)
+                   case (true,bacht_ast_empty_agent()) => (true,x)
                    case (true,ag_cont) => (true,bacht_ast_agent("||",x,ag_cont))
                  }
                }
@@ -243,7 +243,7 @@ class BachTSimul(var bb: BachTStore) {
                {
                  case (false,bacht_ast_delay(time)) => (false,bacht_ast_delay(time))
                  case (false,_) => (false,agent)
-                 case (true,bacht_ast_empty_agent()) => (true,ag_i)
+                 case (true,bacht_ast_empty_agent()) => (true,x)
                  case (true,ag_cont) => (true,bacht_ast_agent("||",x,ag_cont))
                }
              }

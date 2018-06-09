@@ -14,6 +14,7 @@ case class bacht_ast_primitive(primitive: String, token: String) extends Expr
 case class bacht_ast_primitive_with_time(primitive: String, token: String,begin: Int,end:Int) extends Expr
 //case class bacht_ast_dead_agent() extends Expr
 case class bacht_ast_delay(token: Int) extends Expr
+case class bacht_ast_wait(token: Int) extends Expr
 case class bacht_ast_agent(op: String, agenti: Expr, agentii: Expr) extends Expr
 import scala.util.parsing.combinator._
 import scala.util.matching.Regex
@@ -35,16 +36,14 @@ class BachTParsers extends RegexParsers {
       case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _  => bacht_ast_primitive_with_time("get",vtoken,btime.toInt,etime.toInt) }   |
                                    "nask("~token~"," ~time~"," ~time~")" ^^ {
       case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _  => bacht_ast_primitive_with_time("nask",vtoken,btime.toInt,etime.toInt) }  |
-
-                                   "tell("~token~"," ~time~")" ^^ {
-      case _ ~ vtoken ~ "," ~ vtime ~ _ => bacht_ast_primitive_with_time("tell",vtoken,vtime.toInt) }  |
+                                    "tell("~token~"," ~time~")" ^^ {
+      case _ ~ vtoken ~ "," ~ vtime ~ _ => bacht_ast_primitive_with_time("tell",vtoken,0,vtime.toInt) }  |
                                     "ask("~token~"," ~time~")" ^^ {
-      case _ ~ vtoken ~ "," ~ vtime ~ _  => bacht_ast_primitive_with_time("ask",vtoken,vtime.toInt) }   |
+      case _ ~ vtoken ~ "," ~ vtime ~ _  => bacht_ast_primitive_with_time("ask",vtoken,0,vtime.toInt) }   |
                                     "get("~token~"," ~time~")" ^^ {
-      case _ ~ vtoken ~ "," ~ vtime ~ _  => bacht_ast_primitive_with_time("get",vtoken,vtime.toInt) }   |
+      case _ ~ vtoken ~ "," ~ vtime ~ _  => bacht_ast_primitive_with_time("get",vtoken,0,vtime.toInt) }   |
                                    "nask("~token~"," ~time~")" ^^ {
-      case _ ~ vtoken ~ "," ~ vtime ~ _  => bacht_ast_primitive_with_time("nask",vtoken,vtime.toInt) } |
-
+      case _ ~ vtoken ~ "," ~ vtime ~ _  => bacht_ast_primitive_with_time("nask",vtoken,0,vtime.toInt) } |
                                     "tell("~token~")" ^^ {
        case _ ~ vtoken ~ _  => bacht_ast_primitive("tell",vtoken) }  |
                                      "ask("~token~")" ^^ {
@@ -98,7 +97,7 @@ class BachTStore {
 
    var theStoreTime = Map[(String,Int,Int),Int]()
    var theStore = Map[String,Int]()
-   val timestampBegin: Int = (System.currentTimeMillis / 1000).toInt
+   var timestampBegin: Int = (System.currentTimeMillis / 1000).toInt // Time de référence pemet d'éviter de devoir utiliser des nombres énorment dans les primitives
 
    def tell(token:String):Boolean = {
       if (theStore.contains(token)) 
@@ -153,7 +152,8 @@ class BachTStore {
     val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
     val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(checkTime(x._1._2,x._1._3))&&(x._2>=1))
     println("askTime")
-    if (listGoodToken.nonEmpty){true}
+    println(listGoodToken)
+    if (listGoodToken.nonEmpty ||(theStore.contains(token)&&theStore(token) >= 1)){println("ok ack");true}
     else false
 
   }
@@ -169,7 +169,9 @@ class BachTStore {
       theStoreTime(tokenGet._1)=theStoreTime(tokenGet._1)-1
       true
     }
-    else false
+    else get(token)
+
+
 
   }
 
@@ -177,8 +179,9 @@ class BachTStore {
   def nask_time(token:String,begin:Int,end:Int):Boolean = {
     val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
     val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(checkTime(x._1._2,x._1._3))&&(x._2>=1))
+    println(listGoodToken)
     println("naskTime")
-    if (listGoodToken.isEmpty){true}
+    if (listGoodToken.isEmpty&&nask(token)){true}
     else false
   }
 
@@ -229,8 +232,16 @@ class BachTStore {
    }
 
    def clear_store {
-      theStore = Map[String,Int]()
+     theStoreTime = Map[(String,Int,Int),Int]()
+     theStore = Map[String,Int]()
    }
+/*
+On modifie le timestampBegin par le timestamp actuel
+ */
+  def reset_time: Unit ={
+    timestampBegin=(System.currentTimeMillis / 1000).toInt
+    println("New Begin time : "+timestampBegin)
+  }
 
 }
 
@@ -288,7 +299,7 @@ class BachTSimul(var bb: BachTStore) {
                { run_one( y ) match
                  {
                    case (false,_) => (false,bacht_ast_delay(time))
-                   case (true,bacht_ast_empty_agent()) => (true,ag_i)
+                   case (true,bacht_ast_empty_agent()) => (true,x)
                    case (true,ag_cont) => (true,bacht_ast_agent("||",x,ag_cont))
                  }
                }
@@ -298,7 +309,7 @@ class BachTSimul(var bb: BachTStore) {
                {
                  case (false,bacht_ast_delay(time)) => (false,bacht_ast_delay(time))
                  case (false,_) => (false,agent)
-                 case (true,bacht_ast_empty_agent()) => (true,ag_i)
+                 case (true,bacht_ast_empty_agent()) => (true,x)
                  case (true,ag_cont) => (true,bacht_ast_agent("||",x,ag_cont))
                }
              }
@@ -384,11 +395,13 @@ class BachTSimul(var bb: BachTStore) {
                {
                 case (false,bacht_ast_delay(time))=> {
                   Thread.sleep(800)
+                  println(c_agent)
                   false
                 } // gestion du cas ou on ne peut rien faire sauf décrémenter les delays
                  case (false,_)          => true
                  case (true,new_agent)  =>
                     { c_agent = new_agent
+                      println(c_agent)
                       false
                     }
                }
