@@ -27,18 +27,36 @@ class BachTParsers extends RegexParsers {
   val opPara    : Parser[String] = "||"
   val opSeq     : Parser[String] = ";"
 
-  /*
-  On ajoute au parser deux valeur de type qui correspondent au début et la fin de la primitive
-   */
   def primitive : Parser[Expr]   = "tell("~token~"," ~time~"," ~time~")" ^^ {
-    case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _ => bacht_ast_primitive_with_time("tell",vtoken,btime.toInt,etime.toInt) }  |
+      case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _ => bacht_ast_primitive_with_time("tell",vtoken,btime.toInt,etime.toInt) }  |
                                    "ask("~token~"," ~time~"," ~time~")" ^^ {
       case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _  => bacht_ast_primitive_with_time("ask",vtoken,btime.toInt,etime.toInt) }   |
                                     "get("~token~"," ~time~"," ~time~")" ^^ {
       case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _  => bacht_ast_primitive_with_time("get",vtoken,btime.toInt,etime.toInt) }   |
                                    "nask("~token~"," ~time~"," ~time~")" ^^ {
-      case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _  => bacht_ast_primitive_with_time("nask",vtoken,btime.toInt,etime.toInt) }
+      case _ ~ vtoken ~ "," ~ btime ~"," ~ etime ~ _  => bacht_ast_primitive_with_time("nask",vtoken,btime.toInt,etime.toInt) }  |
 
+                                   "tell("~token~"," ~time~")" ^^ {
+      case _ ~ vtoken ~ "," ~ vtime ~ _ => bacht_ast_primitive_with_time("tell",vtoken,vtime.toInt) }  |
+                                    "ask("~token~"," ~time~")" ^^ {
+      case _ ~ vtoken ~ "," ~ vtime ~ _  => bacht_ast_primitive_with_time("ask",vtoken,vtime.toInt) }   |
+                                    "get("~token~"," ~time~")" ^^ {
+      case _ ~ vtoken ~ "," ~ vtime ~ _  => bacht_ast_primitive_with_time("get",vtoken,vtime.toInt) }   |
+                                   "nask("~token~"," ~time~")" ^^ {
+      case _ ~ vtoken ~ "," ~ vtime ~ _  => bacht_ast_primitive_with_time("nask",vtoken,vtime.toInt) } |
+
+                                    "tell("~token~")" ^^ {
+       case _ ~ vtoken ~ _  => bacht_ast_primitive("tell",vtoken) }  |
+                                     "ask("~token~")" ^^ {
+      case _ ~ vtoken ~ _  => bacht_ast_primitive("ask",vtoken) }   |
+                                     "get("~token~")" ^^ {
+      case _ ~ vtoken ~ _  => bacht_ast_primitive("get",vtoken) }   |
+                                    "nask("~token~")" ^^ {
+      case _ ~ vtoken ~ _  => bacht_ast_primitive("nask",vtoken) }  |
+                                    "delay("~time~")" ^^ {
+      case _ ~ vtoken ~ _  => bacht_ast_delay(vtoken.toInt) }       |
+                                      "wait("~time~")" ^^ {
+      case _ ~ vtime ~ _  => bacht_ast_wait(vtime.toInt) }
 
   def agent = compositionChoice
 
@@ -79,10 +97,43 @@ import scala.swing._
 class BachTStore {
 
    var theStoreTime = Map[(String,Int,Int),Int]()
-
+   var theStore = Map[String,Int]()
    val timestampBegin: Int = (System.currentTimeMillis / 1000).toInt
 
+   def tell(token:String):Boolean = {
+      if (theStore.contains(token)) 
+        { theStore(token) = theStore(token) + 1 }
+      else
+        { theStore = theStore ++ Map(token -> 1) }
+      true
+   }
 
+
+   def ask(token:String):Boolean = {
+      if (theStore.contains(token)) 
+             if (theStore(token) >= 1) { true }
+             else { false }
+      else false
+   }
+
+
+   def get(token:String):Boolean = {
+      if (theStore.contains(token)) 
+             if (theStore(token) >= 1) 
+               { theStore(token) = theStore(token) - 1 
+                 true 
+               }
+             else { false }
+      else false
+   }
+
+
+   def nask(token:String):Boolean = {
+      if (theStore.contains(token)) 
+             if (theStore(token) >= 1) { false }
+             else { true }
+      else true 
+   }
 
   // Version avec time
   def tell_time(token:String,begin:Int,end:Int):Boolean = {
@@ -170,14 +221,15 @@ class BachTStore {
      val actTime:Int = (System.currentTimeMillis / 1000).toInt - timestampBegin
      println("Time Store : "+actTime)
       print("{ ")
-
+      for ((t,d) <- theStore) 
+         print ( t + "(" + theStore(t) + ")" )
      for ((t,d) <- theStoreTime)
        print ( t + "(" + theStoreTime(t) + ")" )
       println(" }")
    }
 
    def clear_store {
-      theStoreTime = Map[(String,Int,Int),Int]()
+      theStore = Map[String,Int]()
    }
 
 }
@@ -197,7 +249,10 @@ class BachTSimul(var bb: BachTStore) {
    def run_one(agent: Expr):(Boolean,Expr) = {
 
       agent match {
-
+         case bacht_ast_primitive(prim,token) =>
+            {  if (exec_primitive(prim,token)) { (true,bacht_ast_empty_agent()) }
+               else { (false,agent) }
+            }
          case bacht_ast_primitive_with_time(prim,token,begin,end) =>
           if (bb.checkEnd(end)){
             if (bb.checkBegin(begin)&&exec_primitive_with_time(prim,token,begin,end)) { (true,bacht_ast_empty_agent()) }
@@ -351,6 +406,14 @@ class BachTSimul(var bb: BachTStore) {
        }
    }
 
+   def exec_primitive(prim:String,token:String):Boolean = {
+       prim match
+         { case "tell" => bb.tell(token)
+           case "ask"  => bb.ask(token)
+           case "get"  => bb.get(token)
+           case "nask" => bb.nask(token)
+         }
+   }
 
 
 
