@@ -176,7 +176,7 @@ class BachTSimul(var bb: BachTStore) {
              x = ag_i
              y = ag_ii
            }
-          println(x)
+
            run_one( x ) match
              { case (false,bacht_ast_wait(time)) =>
               { run_one( y ) match
@@ -251,10 +251,8 @@ class BachTSimul(var bb: BachTStore) {
           failure = run_one(c_agent) match
                {
                 case (false,bacht_ast_wait(time))=> {
-                  println("on passe un tour "+time)
-                  println("c_agent actuel : "+c_agent)
                   c_agent=(c_agent)
-                  println("c_agent new : "+c_agent)
+
                   false
                 } // gestion du cas ou on ne peut rien faire sauf décrémenter les delays
                 case (false,_)          => true

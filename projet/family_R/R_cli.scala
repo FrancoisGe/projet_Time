@@ -127,7 +127,7 @@ class BachTStore {
   def ask_time(token:String,time:Int):Boolean = {
     val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(x._1._2-timeStore>0)&&(x._2>=1))
     println("askTime")
-    println(listGoodToken)
+
     if (listGoodToken.nonEmpty){true}
     else false
 
@@ -150,7 +150,7 @@ class BachTStore {
   def nask_time(token:String,time:Int):Boolean = {
     val listGoodToken =theStoreTime.filter(x => (x._1._1.equals(token))&&(x._1._2-timeStore>0)&&(x._2>=1))
     println("naskTime")
-    println(listGoodToken)
+
     if (listGoodToken.isEmpty){true}
     else false
   }
@@ -327,10 +327,8 @@ class BachTSimul(var bb: BachTStore) {
                {
                 case (false,bacht_ast_delay(time))=> {
                   bb.spent_time()
-                  println("on passe un tour "+time)
-                  println("c_agent actuel : "+c_agent)
                   c_agent=sleep_time(c_agent)
-                  println("c_agent new : "+c_agent)
+
                   false
                 } // gestion du cas ou on ne peut rien faire sauf décrémenter les delays
                  case (false,_)          => true

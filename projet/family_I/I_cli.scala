@@ -12,7 +12,6 @@ class Expr
 case class bacht_ast_empty_agent() extends Expr
 case class bacht_ast_primitive(primitive: String, token: String) extends Expr
 case class bacht_ast_primitive_with_time(primitive: String, token: String,begin: Int,end:Int) extends Expr
-//case class bacht_ast_dead_agent() extends Expr
 case class bacht_ast_delay(token: Int) extends Expr
 case class bacht_ast_agent(op: String, agenti: Expr, agentii: Expr) extends Expr
 import scala.util.parsing.combinator._
@@ -80,16 +79,16 @@ class BachTStore {
 
    var theStoreTime = Map[(String,Int,Int),Int]()
 
-   val timestampBegin: Int = (System.currentTimeMillis / 1000).toInt
+   val timestampBegin: Int = (System.currentTimeMillis / 1000).toInt // Timestamp de référence pour éviter les trop grands nombres
 
 
 
-  // Version avec time
+  /*
+  On a refait les exécution des primitive en ajoutant la notion de temps (début et fin)
+   */
   def tell_time(token:String,begin:Int,end:Int):Boolean = {
-
-
     val tokenTime = (token,begin,end)
-    println("tell "+ token)
+    println("tell ")
     if (theStoreTime.contains(tokenTime))
     { theStoreTime(tokenTime) = theStoreTime(tokenTime) + 1 }
     else
